@@ -84,6 +84,37 @@ def get_recommendations():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/recently_added')
+def get_recently_added():
+    try:
+        import sqlite3
+        conn = sqlite3.connect(dashboard_api.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT v.id, v.title, v.channel_name, v.view_count, v.duration, v.created_at
+            FROM videos v
+            ORDER BY v.created_at DESC
+            LIMIT 24
+        ''')
+        rows = cursor.fetchall()
+        conn.close()
+        formatted = []
+        for row in rows:
+            formatted.append({
+                'id': row[0],
+                'title': row[1],
+                'channel_name': row[2],
+                'view_count': row[3],
+                'url': f"https://www.youtube.com/watch?v={row[0]}",
+                'thumbnail': f"https://img.youtube.com/vi/{row[0]}/hqdefault.jpg",
+                'confidence': None,
+                'views_formatted': format_view_count(row[3]),
+                'duration_formatted': format_duration(row[4]),
+            })
+        return jsonify({'success': True, 'videos': formatted, 'total_ratings': get_rated_count_from_database(dashboard_api.db_path)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/rate', methods=['POST'])
 def rate_video():
     try:

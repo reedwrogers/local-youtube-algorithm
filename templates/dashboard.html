@@ -69,6 +69,15 @@
 
     /* Main content */
     main { padding: 16px 24px 32px; max-width: 1400px; margin: 0 auto; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+    .tab {
+      padding: 8px 20px; border: 1px solid var(--border); background: none;
+      color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+      cursor: pointer; letter-spacing: 0.08em; border-radius: 4px;
+      min-height: 36px; transition: all 0.15s;
+    }
+    .tab:hover { border-color: var(--accent); color: var(--accent); }
+    .tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
     #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
     .card { background: var(--surface); display: flex; flex-direction: column; transition: background 0.15s; }
     .card:hover { background: #1e1e1e; }
@@ -113,6 +122,8 @@
       .card-body { padding: 12px 14px; }
       .card-title { font-size: 14px; }
       .confidence { font-size: 10px; padding: 2px 6px; }
+      .tabs { margin-bottom: 12px; }
+      .tab { flex: 1; text-align: center; }
     }
   </style>
 </head>
@@ -144,6 +155,10 @@
 </div>
 
 <main>
+  <div class="tabs">
+    <button class="tab active" data-tab="recommended" onclick="switchTab('recommended')">Recommended</button>
+    <button class="tab" data-tab="recent" onclick="switchTab('recent')">Recently Added</button>
+  </div>
   <div id="loading">fetching recommendations</div>
   <div id="empty">no videos available — fetch more above</div>
   <div id="grid"></div>
@@ -151,10 +166,21 @@
 
 <script>
   let currentTerms = [];
+  let currentTab = 'recommended';
+
+  async function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    await load();
+  }
 
   async function load() {
     try {
-      const res = await fetch('/api/recommendations');
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('empty').style.display = 'none';
+      document.getElementById('grid').innerHTML = '';
+      const endpoint = currentTab === 'recent' ? '/api/recently_added' : '/api/recommendations';
+      const res = await fetch(endpoint);
       const data = await res.json();
       document.getElementById('loading').style.display = 'none';
       document.getElementById('stat-rated').textContent = 'rated: ' + (data.total_ratings ?? '—');
@@ -169,10 +195,11 @@
       videos.forEach(v => {
         const card = document.createElement('div');
         card.className = 'card';
+        const confBadge = v.confidence !== null ? `<span class="confidence">${v.confidence}%</span>` : '';
         card.innerHTML = `
           <div class="thumb-wrap" onclick="window.open('/watch?v=${v.id}', '_blank')">
             <img src="${v.thumbnail}" alt="" loading="lazy">
-            <span class="confidence">${v.confidence}%</span>
+            ${confBadge}
           </div>
           <div class="card-body">
             <a class="card-title" href="/watch?v=${v.id}" target="_blank">${v.title}</a>
@@ -215,9 +242,14 @@
       if (data.success) {
         const log = document.getElementById('fetch-log');
         log.innerHTML = `<span class="new">+${data.fetched} new videos</span>${data.duplicates ? ` · <span class="dupe">${data.duplicates} dupes skipped</span>` : ''}`;
+        // Auto-switch to recently added tab to see new videos
+        switchTab('recent');
+      } else {
+        document.getElementById('fetch-log').innerHTML = `<span style="color:var(--dislike)">Error: ${data.error || 'unknown'}</span>`;
       }
-      await load();
-    } catch(e) {}
+    } catch(e) {
+      document.getElementById('fetch-log').innerHTML = `<span style="color:var(--dislike)">Failed to fetch — check your connection or quota</span>`;
+    }
     btn.textContent = '[ fetch more ]';
     btn.disabled = false;
   }
