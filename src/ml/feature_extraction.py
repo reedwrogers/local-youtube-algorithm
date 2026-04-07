@@ -1,3 +1,5 @@
+import re
+from datetime import datetime, timezone
 from typing import Dict, Tuple
 
 def calculate_basic_video_metrics(video: Dict) -> Tuple:
@@ -31,6 +33,41 @@ def calculate_title_sentiment_score(title: str) -> float:
     negative_count = sum(1 for word in negative_words if word in title)
     return positive_count - negative_count
 
+def calculate_duration_seconds(video: Dict) -> int:
+    """Parse ISO 8601 duration (PT1H2M30S) to total seconds."""
+    duration = video.get('duration', '')
+    match = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', duration)
+    if not match:
+        return 0
+    hours = int(match.group(1) or 0)
+    minutes = int(match.group(2) or 0)
+    seconds = int(match.group(3) or 0)
+    return hours * 3600 + minutes * 60 + seconds
+
+def calculate_video_age_days(video: Dict) -> int:
+    """Calculate how many days ago the video was published."""
+    published = video.get('published_at', '')
+    if not published:
+        return 0
+    try:
+        pub_date = datetime.fromisoformat(published.replace('Z', '+00:00'))
+        now = datetime.now(timezone.utc)
+        return (now - pub_date).days
+    except (ValueError, AttributeError):
+        return 0
+
+def calculate_tag_count(video: Dict) -> int:
+    """Count the number of tags on the video."""
+    tags = video.get('tags', '')
+    if not tags:
+        return 0
+    try:
+        import json
+        tag_list = json.loads(tags)
+        return len(tag_list)
+    except (json.JSONDecodeError, TypeError):
+        return 0
+
 def extract_all_features_from_video(video: Dict) -> Tuple:
     title = video['title'].lower()
     description = video['description'].lower()
@@ -39,4 +76,10 @@ def extract_all_features_from_video(video: Dict) -> Tuple:
     keyword_features = detect_keyword_features_in_video(title, description)
     sentiment_score = calculate_title_sentiment_score(title)
 
-    return basic_metrics + keyword_features + (sentiment_score,)
+    # New features
+    duration_seconds = calculate_duration_seconds(video)
+    video_age_days = calculate_video_age_days(video)
+    tag_count = calculate_tag_count(video)
+    category_id = video.get('category_id', 0)
+
+    return basic_metrics + keyword_features + (sentiment_score, duration_seconds, video_age_days, tag_count, category_id)

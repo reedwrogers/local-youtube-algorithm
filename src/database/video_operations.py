@@ -25,7 +25,7 @@ def save_video_features_to_database(video_id: str, features: Tuple, db_path: str
     cursor = conn.cursor()
 
     cursor.execute('''
-        INSERT OR REPLACE INTO video_features VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO video_features VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (video_id,) + features)
 
     conn.commit()
