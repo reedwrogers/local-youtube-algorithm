@@ -32,28 +32,19 @@ class DashboardAPI:
                 self.model_trained = True
 
     def get_recommendations(self):
+        from src.youtube.utils import filter_out_shorts
         if self.model_trained and self.model is not None:
             video_features = get_unrated_videos_with_features_from_database(self.db_path)
             recommendations = predict_video_preferences_with_model(self.model, video_features)
+            # Also filter out shorts from ML recommendations
+            recommendations = filter_out_shorts(recommendations)
             return recommendations[:12]
         else:
-            fallback_videos = get_unrated_videos_from_database(12, self.db_path)
+            fallback_videos = get_unrated_videos_from_database(50, self.db_path)
+            fallback_videos = filter_out_shorts(fallback_videos)
             for video in fallback_videos:
                 video['like_probability'] = 0.5
-            # Fetch durations for fallback videos
-            self._enrich_with_duration(fallback_videos)
-            return fallback_videos
-
-    def _enrich_with_duration(self, videos):
-        import sqlite3
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        for video in videos:
-            cursor.execute("SELECT duration FROM videos WHERE id = ?", (video['id'],))
-            row = cursor.fetchone()
-            if row:
-                video['duration'] = row[0]
-        conn.close()
+            return fallback_videos[:12]
 
 dashboard_api = DashboardAPI()
 

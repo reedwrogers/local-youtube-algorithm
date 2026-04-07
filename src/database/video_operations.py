@@ -51,7 +51,8 @@ def get_unrated_videos_from_database(limit: int, db_path: str) -> List[Dict]:
             'title': row[1],
             'channel_name': row[8],
             'view_count': row[3],
-            'url': f"https://www.youtube.com/watch?v={row[0]}"
+            'url': f"https://www.youtube.com/watch?v={row[0]}",
+            'duration': row[6],
         })
 
     conn.close()

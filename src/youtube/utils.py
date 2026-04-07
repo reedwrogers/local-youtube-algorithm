@@ -24,8 +24,8 @@ def parse_iso_duration_to_seconds(iso_duration: str) -> int:
     return hours * 3600 + minutes * 60 + seconds
 
 
-def filter_out_shorts(videos: List[Dict], min_duration_seconds: int = 60) -> List[Dict]:
-    """Remove videos shorter than the minimum duration (default 1 minute)."""
+def filter_out_shorts(videos: List[Dict], min_duration_seconds: int = 90) -> List[Dict]:
+    """Remove videos shorter than the minimum duration (default 90 seconds)."""
     return [
         v for v in videos
         if parse_iso_duration_to_seconds(v.get('duration', 'PT0S')) >= min_duration_seconds
