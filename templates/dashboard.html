@@ -176,7 +176,7 @@
           </div>
           <div class="card-body">
             <a class="card-title" href="/watch?v=${v.id}" target="_blank">${v.title}</a>
-            <div class="card-meta">${v.channel_name} · ${v.views_formatted}</div>
+            <div class="card-meta">${v.channel_name} · ${v.views_formatted}${v.duration_formatted ? ' · ' + v.duration_formatted : ''}</div>
           </div>
           <div class="card-actions">
             <button class="btn like" id="like-${v.id}" onclick="rate('${v.id}', true)">&#9650; like</button>

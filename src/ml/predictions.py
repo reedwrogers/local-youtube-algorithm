@@ -27,7 +27,8 @@ def predict_video_preferences_with_model(model, video_features: pd.DataFrame) ->
             'channel_name': row['channel_name'],
             'view_count': row['view_count'],
             'url': f"https://www.youtube.com/watch?v={row['id']}",
-            'like_probability': row['like_probability']
+            'like_probability': row['like_probability'],
+            'duration': row.get('duration', ''),
         })
 
     return recommendations

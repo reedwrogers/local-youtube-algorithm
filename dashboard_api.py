@@ -40,7 +40,20 @@ class DashboardAPI:
             fallback_videos = get_unrated_videos_from_database(12, self.db_path)
             for video in fallback_videos:
                 video['like_probability'] = 0.5
+            # Fetch durations for fallback videos
+            self._enrich_with_duration(fallback_videos)
             return fallback_videos
+
+    def _enrich_with_duration(self, videos):
+        import sqlite3
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        for video in videos:
+            cursor.execute("SELECT duration FROM videos WHERE id = ?", (video['id'],))
+            row = cursor.fetchone()
+            if row:
+                video['duration'] = row[0]
+        conn.close()
 
 dashboard_api = DashboardAPI()
 
@@ -68,7 +81,8 @@ def get_recommendations():
                 'url': video['url'],
                 'thumbnail': f"https://img.youtube.com/vi/{video['id']}/hqdefault.jpg",
                 'confidence': round(video.get('like_probability', 0.5) * 100),
-                'views_formatted': format_view_count(video['view_count'])
+                'views_formatted': format_view_count(video['view_count']),
+                'duration_formatted': format_duration(video.get('duration', '')),
             })
         return jsonify({
             'success': True,
@@ -189,6 +203,21 @@ def format_view_count(count):
         return f"{count/1000:.1f}K views"
     else:
         return f"{count} views"
+
+def format_duration(iso_duration):
+    """Convert ISO 8601 duration (PT1H2M30S) to readable format (1:02:30)."""
+    if not iso_duration:
+        return ''
+    import re
+    match = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', iso_duration)
+    if not match:
+        return ''
+    hours = int(match.group(1) or 0)
+    minutes = int(match.group(2) or 0)
+    seconds = int(match.group(3) or 0)
+    if hours:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes}:{seconds:02d}"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True, port=5001)
