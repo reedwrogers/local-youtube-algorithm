@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reed's Picks</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0e0e0e; --surface: #161616; --border: #2a2a2a;
+      --text: #e8e8e8; --muted: #666; --accent: #5aff8f;
+      --like: #5aff8f; --dislike: #ff5a5a;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; font-weight: 300; min-height: 100vh; }
+    header { border-bottom: 1px solid var(--border); padding: 20px 40px; display: flex; align-items: baseline; justify-content: space-between; }
+    header h1 { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
+    header span { font-size: 12px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    #status-bar { padding: 10px 40px; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); display: flex; gap: 24px; }
+    #status-bar .on { color: var(--accent); }
+    .toolbar { padding: 16px 40px; display: flex; gap: 12px; border-bottom: 1px solid var(--border); }
+    .btn-bar { padding: 10px 20px; border: 1px solid var(--border); background: none; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer; letter-spacing: 0.08em; transition: border-color 0.15s, color 0.15s; }
+    .btn-bar:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-bar:disabled { opacity: 0.4; cursor: default; }
+
+    /* Settings panel */
+    #settings-panel { display: none; border-bottom: 1px solid var(--border); padding: 24px 40px; background: var(--surface); }
+    #settings-panel.open { display: block; }
+    #settings-panel h2 { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+    #fetch-log { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 20px; min-height: 16px; }
+    #fetch-log .new { color: var(--accent); }
+    #fetch-log .dupe { color: var(--muted); }
+    .terms-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .term-tag {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 12px; border: 1px solid var(--border);
+      font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text);
+      background: var(--bg);
+    }
+    .term-tag button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1; padding: 0; }
+    .term-tag button:hover { color: var(--dislike); }
+    .add-term { display: flex; gap: 8px; margin-top: 8px; }
+    .add-term input {
+      flex: 1; max-width: 300px;
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px; padding: 8px 12px; outline: none;
+    }
+    .add-term input:focus { border-color: var(--accent); }
+    .add-term input::placeholder { color: var(--muted); }
+
+    main { padding: 24px 40px; max-width: 1400px; }
+    #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+    .card { background: var(--surface); display: flex; flex-direction: column; transition: background 0.15s; }
+    .card:hover { background: #1e1e1e; }
+    .thumb-wrap { position: relative; aspect-ratio: 16/9; overflow: hidden; cursor: pointer; }
+    .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(0.8); transition: filter 0.2s, transform 0.2s; }
+    .thumb-wrap:hover img { filter: saturate(1.1); transform: scale(1.02); }
+    .confidence { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.85); font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 3px 7px; border: 1px solid var(--border); color: var(--accent); }
+    .card-body { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .card-title { font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--text); cursor: pointer; text-decoration: none; display: block; }
+    .card-title:hover { color: var(--accent); }
+    .card-meta { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+    .card-query { font-size: 10px; color: #444; font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
+    .card-actions { display: flex; gap: 1px; border-top: 1px solid var(--border); margin-top: auto; }
+    .btn { flex: 1; padding: 10px; background: none; border: none; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; transition: background 0.15s, color 0.15s; color: var(--muted); }
+    .btn:hover.like { background: rgba(90,255,143,0.08); color: var(--like); }
+    .btn:hover.dislike { background: rgba(255,90,90,0.08); color: var(--dislike); }
+    .btn.rated-like { color: var(--like); background: rgba(90,255,143,0.06); }
+    .btn.rated-dislike { color: var(--dislike); background: rgba(255,90,90,0.06); }
+    .btn + .btn { border-left: 1px solid var(--border); }
+    #empty { display: none; padding: 80px 0; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); }
+    #loading { padding: 80px 0; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); }
+    #loading::after { content: ''; animation: dots 1.2s infinite; }
+    @keyframes dots { 0% { content: ''; } 33% { content: '.'; } 66% { content: '..'; } 100% { content: '...'; } }
+  </style>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:baseline;gap:16px">
+    <h1>Reed's Picks</h1>
+    <span id="model-status">loading...</span>
+  </div>
+  <div class="header-right">
+    <span id="stat-rated" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)">rated: —</span>
+    <span id="stat-videos" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)">showing: —</span>
+  </div>
+</header>
+
+<div class="toolbar">
+  <button class="btn-bar" id="fetch-btn" onclick="fetchMore()">[ fetch more videos ]</button>
+  <button class="btn-bar" onclick="toggleSettings()">[ search terms ]</button>
+</div>
+
+<div id="settings-panel">
+  <h2>Search Terms</h2>
+  <div id="fetch-log"></div>
+  <div class="terms-list" id="terms-list"></div>
+  <div class="add-term">
+    <input type="text" id="new-term" placeholder="add a search term..." onkeydown="if(event.key==='Enter')addTerm()">
+    <button class="btn-bar" onclick="addTerm()">[ add ]</button>
+  </div>
+</div>
+
+<main>
+  <div id="loading">fetching recommendations</div>
+  <div id="empty">no videos available — fetch more above</div>
+  <div id="grid"></div>
+</main>
+
+<script>
+  let currentTerms = [];
+
+  async function load() {
+    try {
+      const res = await fetch('/api/recommendations');
+      const data = await res.json();
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('stat-rated').textContent = 'rated: ' + (data.total_ratings ?? '—');
+      document.getElementById('model-status').textContent = data.model_trained
+        ? 'ml: active'
+        : 'ml: needs ' + Math.max(0, 10 - (data.total_ratings || 0)) + ' more ratings';
+      const videos = data.videos || [];
+      document.getElementById('stat-videos').textContent = 'showing: ' + videos.length;
+      if (!videos.length) { document.getElementById('empty').style.display = 'block'; return; }
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      videos.forEach(v => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="thumb-wrap" onclick="window.open('/watch?v=${v.id}', '_blank')">
+            <img src="${v.thumbnail}" alt="" loading="lazy">
+            <span class="confidence">${v.confidence}%</span>
+          </div>
+          <div class="card-body">
+            <a class="card-title" href="/watch?v=${v.id}" target="_blank">${v.title}</a>
+            <div class="card-meta">${v.channel_name} &middot; ${v.views_formatted}</div>
+          </div>
+          <div class="card-actions">
+            <button class="btn like" id="like-${v.id}" onclick="rate('${v.id}', true)">&#9650; like</button>
+            <button class="btn dislike" id="dislike-${v.id}" onclick="rate('${v.id}', false)">&#9660; skip</button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    } catch(e) { document.getElementById('loading').textContent = 'error loading'; }
+  }
+
+  async function rate(videoId, liked) {
+    await fetch('/api/rate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ video_id: videoId, liked })
+    });
+    const likeBtn = document.getElementById('like-' + videoId);
+    const dislikeBtn = document.getElementById('dislike-' + videoId);
+    likeBtn.classList.remove('rated-like','rated-dislike');
+    dislikeBtn.classList.remove('rated-like','rated-dislike');
+    if (liked) { likeBtn.classList.add('rated-like'); likeBtn.textContent = '▲ liked'; }
+    else { dislikeBtn.classList.add('rated-dislike'); dislikeBtn.textContent = '▼ skipped'; }
+    const cur = parseInt(document.getElementById('stat-rated').textContent.replace('rated: ','')) || 0;
+    document.getElementById('stat-rated').textContent = 'rated: ' + (cur + 1);
+  }
+
+  async function fetchMore() {
+    const btn = document.getElementById('fetch-btn');
+    btn.textContent = '[ fetching... ]';
+    btn.disabled = true;
+    document.getElementById('fetch-log').innerHTML = '';
+    try {
+      const res = await fetch('/api/fetch_more', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        const log = document.getElementById('fetch-log');
+        log.innerHTML = `<span class="new">+${data.fetched} new videos fetched</span>${data.duplicates ? ` &nbsp;<span class="dupe">(${data.duplicates} duplicates skipped)</span>` : ''}`;
+      }
+      await load();
+    } catch(e) {}
+    btn.textContent = '[ fetch more videos ]';
+    btn.disabled = false;
+  }
+
+  function toggleSettings() {
+    const panel = document.getElementById('settings-panel');
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) loadTerms();
+  }
+
+  async function loadTerms() {
+    const res = await fetch('/api/search_terms');
+    const data = await res.json();
+    currentTerms = data.terms || [];
+    renderTerms();
+  }
+
+  function renderTerms() {
+    const list = document.getElementById('terms-list');
+    list.innerHTML = '';
+    currentTerms.forEach((t, i) => {
+      const tag = document.createElement('div');
+      tag.className = 'term-tag';
+      tag.innerHTML = `<span>${t}</span><button onclick="removeTerm(${i})" title="remove">&times;</button>`;
+      list.appendChild(tag);
+    });
+  }
+
+  async function removeTerm(index) {
+    currentTerms.splice(index, 1);
+    renderTerms();
+    await saveTerms();
+  }
+
+  async function addTerm() {
+    const input = document.getElementById('new-term');
+    const val = input.value.trim();
+    if (!val || currentTerms.includes(val)) return;
+    currentTerms.push(val);
+    input.value = '';
+    renderTerms();
+    await saveTerms();
+  }
+
+  async function saveTerms() {
+    await fetch('/api/search_terms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ terms: currentTerms })
+    });
+  }
+
+  load();
+</script>
+</body>
+</html>
