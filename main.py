@@ -7,7 +7,7 @@ from src.database.preference_operations import save_video_rating_to_database, ge
 
 from src.youtube.search import search_youtube_videos_by_query, get_coding_search_queries
 from src.youtube.details import get_video_details_from_youtube
-from src.youtube.utils import remove_duplicate_videos, filter_out_shorts
+from src.youtube.utils import remove_duplicate_videos, filter_out_shorts, filter_non_english
 
 from src.ml.feature_extraction import extract_all_features_from_video
 from src.ml.model_training import create_recommendation_model, train_model_on_user_preferences
@@ -41,6 +41,7 @@ class VideoInspirationFinderApp:
         
         unique_videos = remove_duplicate_videos(all_videos)
         unique_videos = filter_out_shorts(unique_videos)
+        unique_videos = filter_non_english(unique_videos)
 
         save_videos_to_database(unique_videos, self.db_path)
         

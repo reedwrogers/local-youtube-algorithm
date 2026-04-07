@@ -11,7 +11,8 @@ def search_youtube_videos_by_query(api_key: str, query: str, max_results: int) -
         'order': 'viewCount',
         'maxResults': max_results,
         'videoCategoryId': '28',
-        'publishedAfter': '2020-01-01T00:00:00Z'
+        'publishedAfter': '2020-01-01T00:00:00Z',
+        'relevanceLanguage': 'en',
     }
     try:
         response = requests.get(search_url, params=params)

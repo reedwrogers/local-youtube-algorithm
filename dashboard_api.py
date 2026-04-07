@@ -32,16 +32,18 @@ class DashboardAPI:
                 self.model_trained = True
 
     def get_recommendations(self):
-        from src.youtube.utils import filter_out_shorts
+        from src.youtube.utils import filter_out_shorts, filter_non_english
         if self.model_trained and self.model is not None:
             video_features = get_unrated_videos_with_features_from_database(self.db_path)
             recommendations = predict_video_preferences_with_model(self.model, video_features)
-            # Also filter out shorts from ML recommendations
+            # Filter out shorts and non-English videos
             recommendations = filter_out_shorts(recommendations)
+            recommendations = filter_non_english(recommendations)
             return recommendations[:12]
         else:
-            fallback_videos = get_unrated_videos_from_database(50, self.db_path)
+            fallback_videos = get_unrated_videos_from_database(100, self.db_path)
             fallback_videos = filter_out_shorts(fallback_videos)
+            fallback_videos = filter_non_english(fallback_videos)
             for video in fallback_videos:
                 video['like_probability'] = 0.5
             return fallback_videos[:12]
@@ -90,7 +92,6 @@ def get_recently_added():
         import sqlite3
         conn = sqlite3.connect(dashboard_api.db_path)
         cursor = conn.cursor()
-        # Show unrated videos + videos you already liked (skip disliked ones)
         cursor.execute('''
             SELECT v.id, v.title, v.channel_name, v.view_count, v.duration,
                    p.liked as already_rated
@@ -98,25 +99,24 @@ def get_recently_added():
             LEFT JOIN preferences p ON v.id = p.video_id
             WHERE p.video_id IS NULL OR p.liked = 1
             ORDER BY v.created_at DESC
-            LIMIT 48
+            LIMIT 100
         ''')
         rows = cursor.fetchall()
         conn.close()
+        # Filter out non-English titles
+        from src.youtube.utils import filter_non_english
         formatted = []
         for row in rows:
             formatted.append({
-                'id': row[0],
-                'title': row[1],
-                'channel_name': row[2],
-                'view_count': row[3],
-                'url': f"https://www.youtube.com/watch?v={row[0]}",
+                'id': row[0], 'title': row[1], 'channel_name': row[2],
+                'view_count': row[3], 'url': f"https://www.youtube.com/watch?v={row[0]}",
                 'thumbnail': f"https://img.youtube.com/vi/{row[0]}/hqdefault.jpg",
-                'confidence': None,
-                'views_formatted': format_view_count(row[3]),
+                'confidence': None, 'views_formatted': format_view_count(row[3]),
                 'duration_formatted': format_duration(row[4]),
                 'already_liked': bool(row[5]),
             })
-        return jsonify({'success': True, 'videos': formatted, 'total_ratings': get_rated_count_from_database(dashboard_api.db_path)})
+        formatted = filter_non_english(formatted)
+        return jsonify({'success': True, 'videos': formatted[:48], 'total_ratings': get_rated_count_from_database(dashboard_api.db_path)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -153,7 +153,7 @@ def fetch_more():
     try:
         from src.youtube.search import search_youtube_videos_by_query, get_coding_search_queries
         from src.youtube.details import get_video_details_from_youtube
-        from src.youtube.utils import remove_duplicate_videos, filter_out_shorts
+        from src.youtube.utils import remove_duplicate_videos, filter_out_shorts, filter_non_english
         from src.database.video_operations import save_videos_to_database, save_video_features_to_database
         from src.ml.feature_extraction import extract_all_features_from_video
 
@@ -167,6 +167,7 @@ def fetch_more():
         total_found = len(all_videos)
         unique = remove_duplicate_videos(all_videos)
         unique = filter_out_shorts(unique)
+        unique = filter_non_english(unique)
         save_videos_to_database(unique, db_path)
         for v in unique:
             features = extract_all_features_from_video(v)

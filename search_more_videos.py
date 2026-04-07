@@ -6,7 +6,7 @@ from src.database.manager import setup_database_tables
 from src.database.video_operations import save_videos_to_database, save_video_features_to_database
 from src.youtube.search import search_youtube_videos_by_query, get_coding_search_queries
 from src.youtube.details import get_video_details_from_youtube
-from src.youtube.utils import remove_duplicate_videos, filter_out_shorts
+from src.youtube.utils import remove_duplicate_videos, filter_out_shorts, filter_non_english
 from src.ml.feature_extraction import extract_all_features_from_video
 
 load_dotenv()
@@ -43,6 +43,7 @@ def search_more_videos():
 
     unique_videos = remove_duplicate_videos(all_videos)
     unique_videos = filter_out_shorts(unique_videos)
+    unique_videos = filter_non_english(unique_videos)
 
     if unique_videos:
         save_videos_to_database(unique_videos, db_path)
