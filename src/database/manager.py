@@ -58,10 +58,13 @@ def setup_database_tables(db_path: str):
 
     # Add new columns if they don't exist (safe for existing DBs)
     for col in ['duration_seconds', 'video_age_days', 'tag_count', 'category_id']:
-        cursor.execute(f'''
-            ALTER TABLE video_features ADD COLUMN {col} INTEGER
-        ''')
-        conn.commit()
+        try:
+            cursor.execute(f'''
+                ALTER TABLE video_features ADD COLUMN {col} INTEGER
+            ''')
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
     conn.close()
 
