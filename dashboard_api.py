@@ -90,11 +90,15 @@ def get_recently_added():
         import sqlite3
         conn = sqlite3.connect(dashboard_api.db_path)
         cursor = conn.cursor()
+        # Show unrated videos + videos you already liked (skip disliked ones)
         cursor.execute('''
-            SELECT v.id, v.title, v.channel_name, v.view_count, v.duration, v.created_at
+            SELECT v.id, v.title, v.channel_name, v.view_count, v.duration,
+                   p.liked as already_rated
             FROM videos v
+            LEFT JOIN preferences p ON v.id = p.video_id
+            WHERE p.video_id IS NULL OR p.liked = 1
             ORDER BY v.created_at DESC
-            LIMIT 24
+            LIMIT 48
         ''')
         rows = cursor.fetchall()
         conn.close()
@@ -110,6 +114,7 @@ def get_recently_added():
                 'confidence': None,
                 'views_formatted': format_view_count(row[3]),
                 'duration_formatted': format_duration(row[4]),
+                'already_liked': bool(row[5]),
             })
         return jsonify({'success': True, 'videos': formatted, 'total_ratings': get_rated_count_from_database(dashboard_api.db_path)})
     except Exception as e:

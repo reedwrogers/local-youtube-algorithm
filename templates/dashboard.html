@@ -196,6 +196,10 @@
         const card = document.createElement('div');
         card.className = 'card';
         const confBadge = v.confidence !== null ? `<span class="confidence">${v.confidence}%</span>` : '';
+        const isLiked = v.already_liked;
+        const likeLabel = isLiked ? '▲ liked' : '&#9650; like';
+        const likeClass = isLiked ? 'btn rated-like' : 'btn like';
+        const skipDisabled = isLiked ? 'style="opacity:0.4;pointer-events:none"' : '';
         card.innerHTML = `
           <div class="thumb-wrap" onclick="window.open('/watch?v=${v.id}', '_blank')">
             <img src="${v.thumbnail}" alt="" loading="lazy">
@@ -206,8 +210,8 @@
             <div class="card-meta">${v.channel_name} · ${v.views_formatted}${v.duration_formatted ? ' · ' + v.duration_formatted : ''}</div>
           </div>
           <div class="card-actions">
-            <button class="btn like" id="like-${v.id}" onclick="rate('${v.id}', true)">&#9650; like</button>
-            <button class="btn dislike" id="dislike-${v.id}" onclick="rate('${v.id}', false)">&#9660; skip</button>
+            <button class="${likeClass}" id="like-${v.id}" onclick="rate('${v.id}', true)" ${isLiked ? 'disabled' : ''}>${likeLabel}</button>
+            <button class="btn dislike" id="dislike-${v.id}" onclick="rate('${v.id}', false)" ${skipDisabled}>&#9660; skip</button>
           </div>
         `;
         grid.appendChild(card);
