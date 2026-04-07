@@ -112,7 +112,7 @@ def fetch_more():
     try:
         from src.youtube.search import search_youtube_videos_by_query, get_coding_search_queries
         from src.youtube.details import get_video_details_from_youtube
-        from src.youtube.utils import remove_duplicate_videos
+        from src.youtube.utils import remove_duplicate_videos, filter_out_shorts
         from src.database.video_operations import save_videos_to_database, save_video_features_to_database
         from src.ml.feature_extraction import extract_all_features_from_video
 
@@ -125,6 +125,7 @@ def fetch_more():
             all_videos.extend(videos)
         total_found = len(all_videos)
         unique = remove_duplicate_videos(all_videos)
+        unique = filter_out_shorts(unique)
         save_videos_to_database(unique, db_path)
         for v in unique:
             features = extract_all_features_from_video(v)

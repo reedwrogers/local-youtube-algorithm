@@ -13,19 +13,35 @@
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; font-weight: 300; min-height: 100vh; }
-    header { border-bottom: 1px solid var(--border); padding: 20px 40px; display: flex; align-items: baseline; justify-content: space-between; }
+
+    /* Header */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex; align-items: baseline; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px;
+    }
     header h1 { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
     header span { font-size: 12px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
     .header-right { display: flex; align-items: center; gap: 16px; }
-    #status-bar { padding: 10px 40px; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); display: flex; gap: 24px; }
+
+    /* Status bar */
+    #status-bar { padding: 10px 24px; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); display: flex; gap: 24px; }
     #status-bar .on { color: var(--accent); }
-    .toolbar { padding: 16px 40px; display: flex; gap: 12px; border-bottom: 1px solid var(--border); }
-    .btn-bar { padding: 10px 20px; border: 1px solid var(--border); background: none; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer; letter-spacing: 0.08em; transition: border-color 0.15s, color 0.15s; }
+
+    /* Toolbar */
+    .toolbar { padding: 12px 24px; display: flex; gap: 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .btn-bar {
+      padding: 10px 16px; border: 1px solid var(--border); background: none; color: var(--muted);
+      font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer; letter-spacing: 0.08em;
+      transition: border-color 0.15s, color 0.15s; border-radius: 4px;
+      min-height: 44px; display: flex; align-items: center; justify-content: center;
+    }
     .btn-bar:hover { border-color: var(--accent); color: var(--accent); }
     .btn-bar:disabled { opacity: 0.4; cursor: default; }
 
     /* Settings panel */
-    #settings-panel { display: none; border-bottom: 1px solid var(--border); padding: 24px 40px; background: var(--surface); }
+    #settings-panel { display: none; border-bottom: 1px solid var(--border); padding: 20px 24px; background: var(--surface); }
     #settings-panel.open { display: block; }
     #settings-panel h2 { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
     #fetch-log { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 20px; min-height: 16px; }
@@ -36,44 +52,68 @@
       display: flex; align-items: center; gap: 8px;
       padding: 6px 12px; border: 1px solid var(--border);
       font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text);
-      background: var(--bg);
+      background: var(--bg); border-radius: 4px;
     }
     .term-tag button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1; padding: 0; }
     .term-tag button:hover { color: var(--dislike); }
-    .add-term { display: flex; gap: 8px; margin-top: 8px; }
+    .add-term { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
     .add-term input {
-      flex: 1; max-width: 300px;
+      flex: 1; min-width: 150px;
       background: var(--bg); border: 1px solid var(--border);
       color: var(--text); font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px; padding: 8px 12px; outline: none;
+      font-size: 11px; padding: 10px 12px; outline: none; border-radius: 4px;
+      min-height: 44px;
     }
     .add-term input:focus { border-color: var(--accent); }
     .add-term input::placeholder { color: var(--muted); }
 
-    main { padding: 24px 40px; max-width: 1400px; }
-    #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+    /* Main content */
+    main { padding: 16px 24px 32px; max-width: 1400px; margin: 0 auto; }
+    #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
     .card { background: var(--surface); display: flex; flex-direction: column; transition: background 0.15s; }
     .card:hover { background: #1e1e1e; }
     .thumb-wrap { position: relative; aspect-ratio: 16/9; overflow: hidden; cursor: pointer; }
     .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(0.8); transition: filter 0.2s, transform 0.2s; }
     .thumb-wrap:hover img { filter: saturate(1.1); transform: scale(1.02); }
-    .confidence { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.85); font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 3px 7px; border: 1px solid var(--border); color: var(--accent); }
+    .confidence { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.85); font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 3px 7px; border: 1px solid var(--border); color: var(--accent); border-radius: 3px; }
     .card-body { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
     .card-title { font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--text); cursor: pointer; text-decoration: none; display: block; }
     .card-title:hover { color: var(--accent); }
     .card-meta { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
     .card-query { font-size: 10px; color: #444; font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
     .card-actions { display: flex; gap: 1px; border-top: 1px solid var(--border); margin-top: auto; }
-    .btn { flex: 1; padding: 10px; background: none; border: none; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em; transition: background 0.15s, color 0.15s; color: var(--muted); }
+    .btn {
+      flex: 1; padding: 12px 8px; background: none; border: none; cursor: pointer;
+      font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.05em;
+      transition: background 0.15s, color 0.15s; color: var(--muted);
+      min-height: 44px; display: flex; align-items: center; justify-content: center;
+    }
     .btn:hover.like { background: rgba(90,255,143,0.08); color: var(--like); }
     .btn:hover.dislike { background: rgba(255,90,90,0.08); color: var(--dislike); }
     .btn.rated-like { color: var(--like); background: rgba(90,255,143,0.06); }
     .btn.rated-dislike { color: var(--dislike); background: rgba(255,90,90,0.06); }
     .btn + .btn { border-left: 1px solid var(--border); }
-    #empty { display: none; padding: 80px 0; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); }
-    #loading { padding: 80px 0; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); }
+
+    #empty { display: none; padding: 80px 0; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); text-align: center; }
+    #loading { padding: 80px 0; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); text-align: center; }
     #loading::after { content: ''; animation: dots 1.2s infinite; }
     @keyframes dots { 0% { content: ''; } 33% { content: '.'; } 66% { content: '..'; } 100% { content: '...'; } }
+
+    /* Mobile */
+    @media (max-width: 640px) {
+      header { padding: 12px 16px; flex-direction: column; align-items: flex-start; }
+      header h1 { font-size: 14px; }
+      .header-right { width: 100%; justify-content: flex-start; }
+      .toolbar { padding: 10px 16px; }
+      .btn-bar { flex: 1; }
+      #settings-panel { padding: 16px; }
+      main { padding: 12px 16px 24px; }
+      #grid { grid-template-columns: 1fr; gap: 12px; background: transparent; border: none; }
+      .card { border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+      .card-body { padding: 12px 14px; }
+      .card-title { font-size: 14px; }
+      .confidence { font-size: 10px; padding: 2px 6px; }
+    }
   </style>
 </head>
 <body>
@@ -89,8 +129,8 @@
 </header>
 
 <div class="toolbar">
-  <button class="btn-bar" id="fetch-btn" onclick="fetchMore()">[ fetch more videos ]</button>
-  <button class="btn-bar" onclick="toggleSettings()">[ search terms ]</button>
+  <button class="btn-bar" id="fetch-btn" onclick="fetchMore()">[ fetch more ]</button>
+  <button class="btn-bar" onclick="toggleSettings()">[ terms ]</button>
 </div>
 
 <div id="settings-panel">
@@ -136,7 +176,7 @@
           </div>
           <div class="card-body">
             <a class="card-title" href="/watch?v=${v.id}" target="_blank">${v.title}</a>
-            <div class="card-meta">${v.channel_name} &middot; ${v.views_formatted}</div>
+            <div class="card-meta">${v.channel_name} · ${v.views_formatted}</div>
           </div>
           <div class="card-actions">
             <button class="btn like" id="like-${v.id}" onclick="rate('${v.id}', true)">&#9650; like</button>
@@ -174,11 +214,11 @@
       const data = await res.json();
       if (data.success) {
         const log = document.getElementById('fetch-log');
-        log.innerHTML = `<span class="new">+${data.fetched} new videos fetched</span>${data.duplicates ? ` &nbsp;<span class="dupe">(${data.duplicates} duplicates skipped)</span>` : ''}`;
+        log.innerHTML = `<span class="new">+${data.fetched} new videos</span>${data.duplicates ? ` · <span class="dupe">${data.duplicates} dupes skipped</span>` : ''}`;
       }
       await load();
     } catch(e) {}
-    btn.textContent = '[ fetch more videos ]';
+    btn.textContent = '[ fetch more ]';
     btn.disabled = false;
   }
 
