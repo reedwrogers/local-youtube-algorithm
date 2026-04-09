@@ -32,21 +32,114 @@ class DashboardAPI:
                 self.model_trained = True
 
     def get_recommendations(self):
+        """Return ALL videos ranked by AI confidence, including rated ones."""
+        import sqlite3
         from src.youtube.utils import filter_out_shorts, filter_non_english
+
+        # Fetch all videos with their rating status
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT v.id, v.title, v.channel_name, v.view_count, v.duration, v.thumbnail_url,
+                   p.liked as already_rated,
+                   vf.title_length, vf.has_tutorial_keywords,
+                   vf.has_beginner_keywords, vf.has_ai_keywords, vf.has_challenge_keywords,
+                   vf.engagement_score, vf.view_like_ratio
+            FROM videos v
+            LEFT JOIN preferences p ON v.id = p.video_id
+            LEFT JOIN video_features vf ON v.id = vf.video_id
+            ORDER BY v.created_at DESC
+        ''')
+        rows = cursor.fetchall()
+        conn.close()
+
+        videos = []
+        for row in rows:
+            videos.append({
+                'id': row['id'], 'title': row['title'],
+                'channel_name': row['channel_name'],
+                'view_count': row['view_count'],
+                'url': f"https://www.youtube.com/watch?v={row['id']}",
+                'duration': row['duration'],
+                'thumbnail_url': row['thumbnail_url'],
+                'already_rated': bool(row['already_rated']),
+                'liked': bool(row['already_rated']) and row['already_rated'],
+                'title_length': row['title_length'],
+                'has_tutorial_keywords': row['has_tutorial_keywords'],
+                'has_beginner_keywords': row['has_beginner_keywords'],
+                'has_ai_keywords': row['has_ai_keywords'],
+                'has_challenge_keywords': row['has_challenge_keywords'],
+                'engagement_score': row['engagement_score'],
+                'view_like_ratio': row['view_like_ratio'],
+            })
+
+        # Filter
+        videos = filter_out_shorts(videos)
+        videos = filter_non_english(videos)
+
+        # Score with model or default
+        if self.model_trained and self.model is not None:
+            # Build a DataFrame for prediction
+            import pandas as pd
+            rows_for_df = []
+            for v in videos:
+                rows_for_df.append({
+                    'id': v['id'],
+                    'title': v['title'],
+                    'channel_name': v['channel_name'],
+                    'view_count': v['view_count'],
+                    'duration': v.get('duration', ''),
+                    'title_length': v.get('title_length', 0) or 0,
+                    'description_length': 0,
+                    'view_like_ratio': v.get('view_like_ratio', 0) or 0,
+                    'engagement_score': v.get('engagement_score', 0) or 0,
+                    'title_sentiment': 0,
+                    'has_tutorial_keywords': int(v.get('has_tutorial_keywords', 0) or 0),
+                    'has_time_constraint': 0,
+                    'has_beginner_keywords': int(v.get('has_beginner_keywords', 0) or 0),
+                    'has_ai_keywords': int(v.get('has_ai_keywords', 0) or 0),
+                    'has_challenge_keywords': int(v.get('has_challenge_keywords', 0) or 0),
+                    'duration_seconds': 0,
+                    'video_age_days': 0,
+                    'tag_count': 0,
+                    'category_id': 0,
+                })
+            features_df = pd.DataFrame(rows_for_df)
+            scored = predict_video_preferences_with_model(self.model, features_df)
+            scored_map = {v['id']: v['like_probability'] for v in scored}
+            for v in videos:
+                v['like_probability'] = scored_map.get(v['id'], 0.5)
+        else:
+            for v in videos:
+                v['like_probability'] = 0.5
+
+        # Sort by confidence (highest first), rated videos slightly deprioritized
+        for v in videos:
+            if v['already_rated']:
+                v['like_probability'] *= 0.7  # push rated ones down a bit
+
+        videos.sort(key=lambda x: x['like_probability'], reverse=True)
+        return videos[:48]
+
+    def get_new_videos(self):
+        """Return only unrated videos, sorted by fetch date (newest first)."""
+        from src.youtube.utils import filter_out_shorts, filter_non_english
+
         if self.model_trained and self.model is not None:
             video_features = get_unrated_videos_with_features_from_database(self.db_path)
-            recommendations = predict_video_preferences_with_model(self.model, video_features)
-            # Filter out shorts and non-English videos
-            recommendations = filter_out_shorts(recommendations)
-            recommendations = filter_non_english(recommendations)
-            return recommendations[:12]
+            videos = filter_out_shorts(video_features)
+            videos = filter_non_english(videos)
+            scored = predict_video_preferences_with_model(self.model, videos)
+            scored.sort(key=lambda x: x.get('like_probability', 0.5), reverse=True)
+            return scored[:48]
         else:
-            fallback_videos = get_unrated_videos_from_database(100, self.db_path)
-            fallback_videos = filter_out_shorts(fallback_videos)
-            fallback_videos = filter_non_english(fallback_videos)
-            for video in fallback_videos:
-                video['like_probability'] = 0.5
-            return fallback_videos[:12]
+            videos = get_unrated_videos_from_database(100, self.db_path)
+            videos = filter_out_shorts(videos)
+            videos = filter_non_english(videos)
+            for v in videos:
+                v['like_probability'] = 0.5
+            return videos[:48]
 
 dashboard_api = DashboardAPI()
 
@@ -76,6 +169,8 @@ def get_recommendations():
                 'confidence': round(video.get('like_probability', 0.5) * 100),
                 'views_formatted': format_view_count(video['view_count']),
                 'duration_formatted': format_duration(video.get('duration', '')),
+                'already_rated': video.get('already_rated', False),
+                'liked': video.get('liked', False),
             })
         return jsonify({
             'success': True,
@@ -89,34 +184,20 @@ def get_recommendations():
 @app.route('/api/recently_added')
 def get_recently_added():
     try:
-        import sqlite3
-        conn = sqlite3.connect(dashboard_api.db_path)
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT v.id, v.title, v.channel_name, v.view_count, v.duration,
-                   p.liked as already_rated
-            FROM videos v
-            LEFT JOIN preferences p ON v.id = p.video_id
-            WHERE p.video_id IS NULL OR p.liked = 1
-            ORDER BY v.created_at DESC
-            LIMIT 100
-        ''')
-        rows = cursor.fetchall()
-        conn.close()
-        # Filter out non-English titles
-        from src.youtube.utils import filter_non_english
+        videos = dashboard_api.get_new_videos()
         formatted = []
-        for row in rows:
+        for video in videos:
             formatted.append({
-                'id': row[0], 'title': row[1], 'channel_name': row[2],
-                'view_count': row[3], 'url': f"https://www.youtube.com/watch?v={row[0]}",
-                'thumbnail': f"https://img.youtube.com/vi/{row[0]}/hqdefault.jpg",
-                'confidence': None, 'views_formatted': format_view_count(row[3]),
-                'duration_formatted': format_duration(row[4]),
-                'already_liked': bool(row[5]),
+                'id': video['id'], 'title': video['title'], 'channel_name': video['channel_name'],
+                'view_count': video['view_count'], 'url': video.get('url', f"https://www.youtube.com/watch?v={video['id']}"),
+                'thumbnail': f"https://img.youtube.com/vi/{video['id']}/hqdefault.jpg",
+                'confidence': round(video.get('like_probability', 0.5) * 100),
+                'views_formatted': format_view_count(video['view_count']),
+                'duration_formatted': format_duration(video.get('duration', '')),
+                'already_rated': False,
+                'liked': False,
             })
-        formatted = filter_non_english(formatted)
-        return jsonify({'success': True, 'videos': formatted[:48], 'total_ratings': get_rated_count_from_database(dashboard_api.db_path)})
+        return jsonify({'success': True, 'videos': formatted, 'total_ratings': get_rated_count_from_database(dashboard_api.db_path)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
