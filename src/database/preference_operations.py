@@ -25,8 +25,15 @@ def get_training_data_from_database(db_path: str) -> pd.DataFrame:
 
 def get_unrated_videos_with_features_from_database(db_path: str) -> pd.DataFrame:
     conn = sqlite3.connect(db_path)
+    # Explicitly select columns to avoid duplicate column name collisions
+    # (both videos and video_features have category_id)
     query = '''
-        SELECT v.*, vf.*
+        SELECT v.id, v.title, v.channel_name, v.view_count, v.duration,
+               vf.title_length, vf.description_length, vf.view_like_ratio,
+               vf.engagement_score, vf.title_sentiment, vf.has_tutorial_keywords,
+               vf.has_time_constraint, vf.has_beginner_keywords, vf.has_ai_keywords,
+               vf.has_challenge_keywords, vf.duration_seconds, vf.video_age_days,
+               vf.tag_count, vf.category_id
         FROM videos v
         JOIN video_features vf ON v.id = vf.video_id
         LEFT JOIN preferences p ON v.id = p.video_id
