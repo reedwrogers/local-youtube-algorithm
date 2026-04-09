@@ -293,8 +293,14 @@
       const data = await res.json();
       if (data.success) {
         const log = document.getElementById('fetch-log');
-        log.innerHTML = `<span class="new">+${data.fetched} new videos</span>${data.duplicates ? ` · <span class="dupe">${data.duplicates} dupes skipped</span>` : ''}`;
-        showToast(`+${data.fetched} new videos fetched${data.duplicates ? ` (${data.duplicates} dupes)` : ''}`);
+        if (data.fetched === 0) {
+          const detail = data.detail || 'No videos found';
+          log.innerHTML = `<span style="color:var(--dislike)">${detail}</span>`;
+          showToast(`0 new videos — ${detail}`, true);
+        } else {
+          log.innerHTML = `<span class="new">+${data.fetched} new videos</span>${data.duplicates ? ` · <span class="dupe">${data.duplicates} dupes skipped</span>` : ''}`;
+          showToast(`+${data.fetched} new videos fetched${data.duplicates ? ` (${data.duplicates} dupes)` : ''}`);
+        }
         // Refresh the current tab — don't auto-switch
         await load();
       } else {

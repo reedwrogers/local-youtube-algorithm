@@ -14,14 +14,13 @@ def predict_video_preferences_with_model(model, video_features: pd.DataFrame) ->
 
     X = video_features[feature_columns]
     probabilities = model.predict_proba(X)[:, 1]
-    
+
     video_features_copy = video_features.copy()
     video_features_copy['like_probability'] = probabilities
 
-    top_videos = video_features_copy.nlargest(10, 'like_probability')
-
+    # Return ALL scored videos (caller can limit)
     recommendations = []
-    for _, row in top_videos.iterrows():
+    for _, row in video_features_copy.iterrows():
         recommendations.append({
             'id': row['id'],
             'title': row['title'],

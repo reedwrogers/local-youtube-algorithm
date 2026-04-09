@@ -1,7 +1,11 @@
 import os
+import logging
 from flask import Flask, jsonify, render_template, request, redirect
 from flask_cors import CORS
 from dotenv import load_dotenv
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+logger = logging.getLogger(__name__)
 
 from src.database.manager import setup_database_tables
 from src.database.preference_operations import get_training_data_from_database, get_unrated_videos_with_features_from_database, get_rated_count_from_database, save_video_rating_to_database
@@ -123,7 +127,7 @@ class DashboardAPI:
         return videos[:48]
 
     def get_new_videos(self):
-        """Return only unrated videos, sorted by fetch date (newest first)."""
+        """Return only unrated videos, sorted by AI score (highest first)."""
         from src.youtube.utils import filter_out_shorts, filter_non_english
 
         if self.model_trained and self.model is not None:
@@ -134,7 +138,7 @@ class DashboardAPI:
             scored.sort(key=lambda x: x.get('like_probability', 0.5), reverse=True)
             return scored[:48]
         else:
-            videos = get_unrated_videos_from_database(100, self.db_path)
+            videos = get_unrated_videos_from_database(200, self.db_path)
             videos = filter_out_shorts(videos)
             videos = filter_non_english(videos)
             for v in videos:
@@ -240,21 +244,58 @@ def fetch_more():
 
         api_key = os.getenv('YOUTUBE_API_KEY')
         db_path = dashboard_api.db_path
+
+        if not api_key:
+            logger.error("YOUTUBE_API_KEY is not set")
+            return jsonify({'success': False, 'error': 'YOUTUBE_API_KEY not set in environment'}), 400
+
+        logger.info("Starting fetch_more...")
+
+        queries = get_coding_search_queries()
+        logger.info(f"Search queries ({len(queries)}): {queries}")
+
         all_videos = []
-        for query in get_coding_search_queries():
-            ids = search_youtube_videos_by_query(api_key, query, 20)
-            videos = get_video_details_from_youtube(api_key, ids)
-            all_videos.extend(videos)
+        per_query_counts = {}
+        for query in queries:
+            try:
+                ids = search_youtube_videos_by_query(api_key, query, 20)
+                per_query_counts[query] = len(ids)
+                logger.info(f"  Query '{query}': {len(ids)} video IDs returned")
+                if ids:
+                    videos = get_video_details_from_youtube(api_key, ids)
+                    logger.info(f"  Query '{query}': {len(videos)} video details fetched")
+                    all_videos.extend(videos)
+                else:
+                    logger.warning(f"  Query '{query}': No IDs returned — may be API quota or no results")
+            except Exception as e:
+                logger.error(f"  Query '{query}' failed: {e}")
+
         total_found = len(all_videos)
+        logger.info(f"Total raw videos collected: {total_found}")
+
+        if total_found == 0:
+            return jsonify({'success': True, 'fetched': 0, 'duplicates': 0, 'detail': 'No videos found from any query — check API key quota or results'})
+
         unique = remove_duplicate_videos(all_videos)
+        logger.info(f"After dedup: {len(unique)} (removed {total_found - len(unique)} duplicates)")
+
         unique = filter_out_shorts(unique)
+        logger.info(f"After filtering shorts: {len(unique)}")
+
         unique = filter_non_english(unique)
+        logger.info(f"After filtering non-English: {len(unique)}")
+
         save_videos_to_database(unique, db_path)
+        logger.info(f"Saved {len(unique)} videos to database")
+
         for v in unique:
             features = extract_all_features_from_video(v)
             save_video_features_to_database(v['id'], features, db_path)
+        logger.info(f"Extracted features for {len(unique)} videos")
+
         return jsonify({'success': True, 'fetched': len(unique), 'duplicates': total_found - len(unique)})
     except Exception as e:
+        logger.exception(f"Unhandled error in fetch_more: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/search_terms', methods=['GET'])
