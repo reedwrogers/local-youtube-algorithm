@@ -35,6 +35,49 @@ class DashboardAPI:
             if success:
                 self.model_trained = True
 
+    def _score_videos(self, videos):
+        """Score a list of videos using the model. Returns videos with 'like_probability' set."""
+        if self.model_trained and self.model is not None and videos:
+            import sqlite3
+            import pandas as pd
+
+            video_ids = [v['id'] for v in videos]
+            placeholders = ','.join('?' for _ in video_ids)
+
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute(f'''
+                SELECT v.id, v.title, v.channel_name, v.view_count, v.duration,
+                       vf.title_length, vf.description_length, vf.view_like_ratio,
+                       vf.engagement_score, vf.title_sentiment, vf.has_tutorial_keywords,
+                       vf.has_time_constraint, vf.has_beginner_keywords, vf.has_ai_keywords,
+                       vf.has_challenge_keywords, vf.duration_seconds, vf.video_age_days,
+                       vf.tag_count, vf.category_id
+                FROM video_features vf
+                JOIN videos v ON v.id = vf.video_id
+                WHERE v.id IN ({placeholders})
+            ''', video_ids)
+            rows = cursor.fetchall()
+            conn.close()
+
+            scored_map = {}
+            if rows:
+                cols = ['id', 'title', 'channel_name', 'view_count', 'duration',
+                        'title_length', 'description_length', 'view_like_ratio',
+                        'engagement_score', 'title_sentiment', 'has_tutorial_keywords',
+                        'has_time_constraint', 'has_beginner_keywords', 'has_ai_keywords',
+                        'has_challenge_keywords', 'duration_seconds', 'video_age_days',
+                        'tag_count', 'category_id']
+                df = pd.DataFrame(rows, columns=cols)
+                scored = predict_video_preferences_with_model(self.model, df)
+                scored_map = {v['id']: v['like_probability'] for v in scored}
+
+            for v in videos:
+                v['like_probability'] = scored_map.get(v['id'], 0.5)
+        else:
+            for v in videos:
+                v['like_probability'] = 0.5
+
     def get_recommendations(self):
         """Return ALL videos ranked by AI confidence, including rated ones."""
         import sqlite3
@@ -45,14 +88,10 @@ class DashboardAPI:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT v.id, v.title, v.channel_name, v.view_count, v.duration, v.thumbnail_url,
-                   p.liked as already_rated,
-                   vf.title_length, vf.has_tutorial_keywords,
-                   vf.has_beginner_keywords, vf.has_ai_keywords, vf.has_challenge_keywords,
-                   vf.engagement_score, vf.view_like_ratio
+            SELECT v.id, v.title, v.channel_name, v.view_count, v.duration,
+                   p.liked as already_rated
             FROM videos v
             LEFT JOIN preferences p ON v.id = p.video_id
-            LEFT JOIN video_features vf ON v.id = vf.video_id
             ORDER BY v.created_at DESC
         ''')
         rows = cursor.fetchall()
@@ -66,57 +105,16 @@ class DashboardAPI:
                 'view_count': row['view_count'],
                 'url': f"https://www.youtube.com/watch?v={row['id']}",
                 'duration': row['duration'],
-                'thumbnail_url': row['thumbnail_url'],
                 'already_rated': bool(row['already_rated']),
                 'liked': bool(row['already_rated']) and row['already_rated'],
-                'title_length': row['title_length'],
-                'has_tutorial_keywords': row['has_tutorial_keywords'],
-                'has_beginner_keywords': row['has_beginner_keywords'],
-                'has_ai_keywords': row['has_ai_keywords'],
-                'has_challenge_keywords': row['has_challenge_keywords'],
-                'engagement_score': row['engagement_score'],
-                'view_like_ratio': row['view_like_ratio'],
             })
 
         # Filter
         videos = filter_out_shorts(videos)
         videos = filter_non_english(videos)
 
-        # Score with model or default
-        if self.model_trained and self.model is not None:
-            # Build a DataFrame for prediction
-            import pandas as pd
-            rows_for_df = []
-            for v in videos:
-                rows_for_df.append({
-                    'id': v['id'],
-                    'title': v['title'],
-                    'channel_name': v['channel_name'],
-                    'view_count': v['view_count'],
-                    'duration': v.get('duration', ''),
-                    'title_length': v.get('title_length', 0) or 0,
-                    'description_length': 0,
-                    'view_like_ratio': v.get('view_like_ratio', 0) or 0,
-                    'engagement_score': v.get('engagement_score', 0) or 0,
-                    'title_sentiment': 0,
-                    'has_tutorial_keywords': int(v.get('has_tutorial_keywords', 0) or 0),
-                    'has_time_constraint': 0,
-                    'has_beginner_keywords': int(v.get('has_beginner_keywords', 0) or 0),
-                    'has_ai_keywords': int(v.get('has_ai_keywords', 0) or 0),
-                    'has_challenge_keywords': int(v.get('has_challenge_keywords', 0) or 0),
-                    'duration_seconds': 0,
-                    'video_age_days': 0,
-                    'tag_count': 0,
-                    'category_id': 0,
-                })
-            features_df = pd.DataFrame(rows_for_df)
-            scored = predict_video_preferences_with_model(self.model, features_df)
-            scored_map = {v['id']: v['like_probability'] for v in scored}
-            for v in videos:
-                v['like_probability'] = scored_map.get(v['id'], 0.5)
-        else:
-            for v in videos:
-                v['like_probability'] = 0.5
+        # Score using real feature values (same as New tab)
+        self._score_videos(videos)
 
         # Sort by confidence (highest first), rated videos slightly deprioritized
         for v in videos:
@@ -128,28 +126,49 @@ class DashboardAPI:
 
     def get_new_videos(self):
         """Return only unrated videos, sorted by AI score (highest first)."""
+        import sqlite3
+        import pandas as pd
         from src.youtube.utils import filter_out_shorts, filter_non_english
 
-        if self.model_trained and self.model is not None:
-            video_features = get_unrated_videos_with_features_from_database(self.db_path)
-            # Convert DataFrame to list of dicts for filtering
-            videos = video_features.to_dict('records')
-            videos = filter_out_shorts(videos)
-            videos = filter_non_english(videos)
-            # Re-score with model (need to pass DataFrame)
-            scored = predict_video_preferences_with_model(self.model, video_features)
-            scored_map = {v['id']: v['like_probability'] for v in scored}
-            for v in videos:
-                v['like_probability'] = scored_map.get(v['id'], 0.5)
-            videos.sort(key=lambda x: x.get('like_probability', 0.5), reverse=True)
-            return videos[:48]
-        else:
+        if not self.model_trained or self.model is None:
             videos = get_unrated_videos_from_database(200, self.db_path)
             videos = filter_out_shorts(videos)
             videos = filter_non_english(videos)
             for v in videos:
                 v['like_probability'] = 0.5
             return videos[:48]
+
+        # Fetch unrated videos as a DataFrame with real features
+        video_features = get_unrated_videos_with_features_from_database(self.db_path)
+
+        if video_features.empty:
+            return []
+
+        # Filter to list of dicts
+        videos = filter_out_shorts(video_features.to_dict('records'))
+        videos = filter_non_english(videos)
+
+        if not videos:
+            return []
+
+        # Score the filtered videos using the model
+        scored_df = video_features
+        # Filter the DataFrame to only include videos that passed filters
+        video_id_set = set(v['id'] for v in videos)
+        scored_df = scored_df[scored_df['id'].isin(video_id_set)]
+
+        if scored_df.empty:
+            for v in videos:
+                v['like_probability'] = 0.5
+            return videos[:48]
+
+        scored = predict_video_preferences_with_model(self.model, scored_df)
+        scored_map = {v['id']: v['like_probability'] for v in scored}
+        for v in videos:
+            v['like_probability'] = scored_map.get(v['id'], 0.5)
+
+        videos.sort(key=lambda x: x.get('like_probability', 0.5), reverse=True)
+        return videos[:48]
 
 dashboard_api = DashboardAPI()
 
