@@ -132,11 +132,17 @@ class DashboardAPI:
 
         if self.model_trained and self.model is not None:
             video_features = get_unrated_videos_with_features_from_database(self.db_path)
-            videos = filter_out_shorts(video_features)
+            # Convert DataFrame to list of dicts for filtering
+            videos = video_features.to_dict('records')
+            videos = filter_out_shorts(videos)
             videos = filter_non_english(videos)
-            scored = predict_video_preferences_with_model(self.model, videos)
-            scored.sort(key=lambda x: x.get('like_probability', 0.5), reverse=True)
-            return scored[:48]
+            # Re-score with model (need to pass DataFrame)
+            scored = predict_video_preferences_with_model(self.model, video_features)
+            scored_map = {v['id']: v['like_probability'] for v in scored}
+            for v in videos:
+                v['like_probability'] = scored_map.get(v['id'], 0.5)
+            videos.sort(key=lambda x: x.get('like_probability', 0.5), reverse=True)
+            return videos[:48]
         else:
             videos = get_unrated_videos_from_database(200, self.db_path)
             videos = filter_out_shorts(videos)
@@ -189,6 +195,7 @@ def get_recommendations():
 def get_recently_added():
     try:
         videos = dashboard_api.get_new_videos()
+        logger.info(f"get_recently_added: returning {len(videos)} videos")
         formatted = []
         for video in videos:
             formatted.append({
@@ -203,6 +210,7 @@ def get_recently_added():
             })
         return jsonify({'success': True, 'videos': formatted, 'total_ratings': get_rated_count_from_database(dashboard_api.db_path)})
     except Exception as e:
+        logger.exception(f"Error in get_recently_added: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/rate', methods=['POST'])
